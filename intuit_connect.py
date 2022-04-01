@@ -1,19 +1,26 @@
 from intuitlib.client import AuthClient
 from intuitlib.enums import Scopes
 import webbrowser
+import json
+
+config_file_path = "./config.json"
+
+with open( config_file_path ) as config_f :
+    config_data = json.load( config_f )
+
+client_id = config_data[ 'client_id' ]
+client_secret = config_data[ 'client_secret' ]
+redirect_uri = config_data[ 'redirect_uri' ]
+environment = config_data[ 'environment' ]
 
 # Instantiate client
-auth_client = AuthClient(
-    "ABcWQcMeUTm1r9Qq209oSi8ZIvTJ47HpKPqDF3tOOqHiPKicKN",
-    "QX7rR2fWdE0TEZbqi537OOYpLiKiSPd4D05xTK4d",
-    "https://developer.intuit.com/v2/OAuth2Playground/RedirectUrl",
-    "sandbox",
-)
+auth_client = AuthClient( client_id = client_id,
+                          client_secret = client_secret,
+                          redirect_uri = redirect_uri,
+                          environment = environment )
 
 # Prepare scores
-scopes = [
-    Scopes.ACCOUNTING,
-]
+scopes = [ Scopes.ACCOUNTING ]
 
 # Get auth URL
 auth_url = auth_client.get_authorization_url( scopes )
@@ -34,3 +41,10 @@ refresh_token = auth_client.refresh_token
 
 print( "Access token:", access_token )
 print( "Refresh token:", refresh_token )
+
+config_data[ 'access_token' ] = access_token
+config_data[ 'refresh_token' ] = refresh_token
+
+with open( config_file_path, 'w' ) as config_f :
+    json.dump( config_data, config_f )
+
