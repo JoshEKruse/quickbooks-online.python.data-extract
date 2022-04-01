@@ -1,17 +1,30 @@
 from intuitlib.client import AuthClient
 from intuitlib.enums import Scopes
+from google.cloud import bigquery
 import webbrowser
 import json
+import os
 
-config_file_path = "./config.json"
+company_id = '9130352109852406'
 
-with open( config_file_path ) as config_f :
-    config_data = json.load( config_f )
+bq_client = bigquery.Client()
 
-client_id = config_data[ 'client_id' ]
-client_secret = config_data[ 'client_secret' ]
-redirect_uri = config_data[ 'redirect_uri' ]
-environment = config_data[ 'environment' ]
+query_job = bq_client.query(
+    f"""
+    SELECT *
+    FROM `yetibooks-reporting.Utility.QBO_Secret_Store`
+    WHERE company_id = '{ company_id }'
+    """
+)
+
+results = query_job.result()
+
+for row in results :
+
+    client_id = row.client_id
+    client_secret = row.client_secret
+    redirect_uri = row.redirect_url
+    environment = row.environment
 
 # Instantiate client
 auth_client = AuthClient( client_id = client_id,
@@ -39,12 +52,13 @@ auth_client.get_bearer_token( auth_code, realm_id=realm_id )
 access_token = auth_client.access_token
 refresh_token = auth_client.refresh_token
 
-print( "Access token:", access_token )
-print( "Refresh token:", refresh_token )
+update_job = bq_client.query(
+    f"""
+    Update`yetibooks-reporting.Utility.QBO_Secret_Store`
+        set access_token = '{ access_token }'
+           ,refresh_token = '{ refresh_token }'
+    where company_id = '{ company_id }'
+    """
+)
 
-config_data[ 'access_token' ] = access_token
-config_data[ 'refresh_token' ] = refresh_token
-
-with open( config_file_path, 'w' ) as config_f :
-    json.dump( config_data, config_f )
-
+result = update_job.result()
