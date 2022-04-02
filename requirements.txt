@@ -1,8 +1,10 @@
 cachetools==5.0.0
 certifi==2021.10.8
 charset-normalizer==2.0.12
+click==8.1.2
 ecdsa==0.17.0
 enum-compat==0.0.3
+Flask==2.1.1
 future==0.18.2
 google-api-core==2.7.1
 google-auth==2.6.2
@@ -16,6 +18,9 @@ grpcio==1.44.0
 grpcio-status==1.44.0
 idna==3.3
 intuit-oauth==1.2.4
+itsdangerous==2.1.2
+Jinja2==3.1.1
+MarkupSafe==2.1.1
 numpy==1.22.3
 oauthlib==3.2.0
 packaging==21.3
@@ -36,3 +41,4 @@ rsa==4.8
 simplejson==3.17.6
 six==1.16.0
 urllib3==1.26.9
+Werkzeug==2.1.1
