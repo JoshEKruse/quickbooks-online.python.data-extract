@@ -60,11 +60,16 @@ def extract_data() :
 
         customer_list.append( customer.to_json() )
 
-    client = storage.Client( project='' )
-    bucket = client.get_bucket( '' )
-    blob = bucket.blob( 't.json' )
+    blob_name = 'test_blob_1.json'
 
-    with open( 't.json', 'rb' ) as f :
+    with open( blob_name, 'w' ) as f :
+        json.dump( customer_list, f )
+
+    client = storage.Client( project='yetibooks-reporting' )
+    bucket = client.get_bucket( 'qbo_raw' )
+    blob = bucket.blob( blob_name )
+
+    with open( blob_name, 'rb' ) as f :
         blob.upload_from_file( f )
 
     return 'ok', 200
