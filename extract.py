@@ -4,6 +4,7 @@ from google.cloud import bigquery
 from quickbooks import QuickBooks
 from quickbooks.objects import Customer
 import json
+import os
 
 app = Flask( __name__ )
 
