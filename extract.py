@@ -1,6 +1,8 @@
 from flask import Flask, request
 from intuitlib.client import AuthClient
 from google.cloud import bigquery
+from google.cloud import storage
+from google.cloud.storage import blob
 from quickbooks import QuickBooks
 from quickbooks.objects import Customer
 import json
@@ -44,18 +46,26 @@ def extract_data() :
     )
     
     # Instantiate client
-    client = QuickBooks(
+    qb_client = QuickBooks(
         auth_client = auth_client,
         refresh_token = refresh_token,
         company_id = company_id,
     )
     
     
-    customers = Customer.all( qb=client )
+    customers = Customer.all( qb=qb_client )
     
+    customer_list = []
     for customer in customers :
-        json_data = customer.to_json()
-        print( json_data )
+
+        customer_list.append( customer.to_json() )
+
+    client = storage.Client( project='' )
+    bucket = client.get_bucket( '' )
+    blob = bucket.blob( 't.json' )
+
+    with open( 't.json', 'rb' ) as f :
+        blob.upload_from_file( f )
 
     return 'ok', 200
 
