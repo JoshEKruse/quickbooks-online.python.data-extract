@@ -12,5 +12,6 @@ RUN pip install --upgrade pip
 RUN pip install -r requirements.txt
 
 COPY . .
+ENV PORT 8080
 
 CMD [ "python", "extract.py" ]
