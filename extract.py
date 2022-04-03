@@ -1,17 +1,107 @@
 from flask import Flask, request
 from intuitlib.client import AuthClient
 from google.cloud import bigquery
+from google.cloud.bigquery import Client
 from google.cloud import storage
 from google.cloud.storage import blob
 from quickbooks import QuickBooks
 from quickbooks.objects import Customer
 import json
+import csv
 import os
+import datetime
 
 app = Flask( __name__ )
 
+def initialize_clients( company_id: str ) -> QuickBooks, Client :
+    """Initializes the QuickBooks and BigQuery Clients
+
+    Args :
+        company_id (str) : company to pull secrets for
+
+    Returns :
+        QuickBooks : quickbooks client
+        Client : bigquery client
+    """
+
+    bq_client = bigquery.Client()
+    
+    query_job = bq_client.query(
+        f"""
+        SELECT *
+        FROM `yetibooks-reporting.Utility.QBO_Secret_Store`
+        WHERE company_id = '{ company_id }'
+        """
+    )
+    
+    results = query_job.result()
+    
+    for row in results :
+    
+        client_id = row.client_id
+        client_secret = row.client_secret
+        access_token = row.access_token
+        environment = row.environment
+        redirect_uri = row.redirect_url
+        refresh_token = row.refresh_token
+    
+    # Instantiate auth client
+    auth_client = AuthClient(
+        client_id = client_id,
+        client_secret = client_secret,
+        access_token = access_token,
+        environment = environment,
+        redirect_uri = redirect_uri,
+    )
+    
+    # Instantiate client
+    qb_client = QuickBooks(
+        auth_client = auth_client,
+        refresh_token = refresh_token,
+        company_id = company_id,
+    )
+
+    return qb_client, bq_client
+
+def insert_data( bq_client: Client, filename: str ) -> str :
+    """Insert/Appends data to a BQ table
+
+    Args: 
+        bq_client (Client) : client to make api calls to
+        filename (str) : local file to insert into BQ table
+
+    Returns :
+        str : 'ok' response
+    """
+
+    table_id = 'yetibooks-reporting.qbo_raw.customers'
+
+    job_config = bigquery.LoadJobConfig(
+        schema = [ bigquery.SchemaField( 'id', 'INT64' ),
+                   bigquery.SchemaField( 'company_id', 'INT64' ),
+                   bigquery.SchemaField( 'rowloadeddatetime', 'TIMESTAMP' ),
+                   bigquery.SchemaField( 'payload', 'STRING' ) ],
+        write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
+        source_format = bigquery.SourceFormat.CSV,
+    )
+
+    with open( filename, 'rb' ) as f :
+        
+        load_job = bq_client.load_table_from_file( f,
+                                                   table_id,
+                                                   job_config = job_config )
+
+        load_job.result()  # Waits for the job to complete.
+
+    destination_table = client.get_table( table_id )
+    print( f'Loaded { destination_table.num_row } rows.' )
+
+    return 'ok'
+
 @app.route( '/' )
 def extract_data() :
+    """Driver code for the extract QuickBooksOnline extract
+    """
     
     company_id = '9130352109852406'
     
@@ -52,28 +142,24 @@ def extract_data() :
         company_id = company_id,
     )
     
-    
     customers = Customer.all( qb=qb_client )
-    
-    customer_list = []
-    for customer in customers :
 
-        customer_list.append( customer.to_json() )
+    customer_list = [ json.dumps( customer.to_json() ) for customer in customers ]
 
-    blob_name = 'test_blob_1.json'
+    with open( 'test_blob_1.csv', 'w' ) as f :
 
-    with open( blob_name, 'w' ) as f :
-        json.dump( customer_list, f )
+        writer = csv.writer( f )
+        for index, item in enumerate( customer_list ) : 
+            print( item )
+            writer.writerow( [ index, company_id, datetime.datetime.today(), item ] )
 
-    client = storage.Client( project='yetibooks-reporting' )
-    bucket = client.get_bucket( 'qbo_raw' )
-    blob = bucket.blob( blob_name )
+    blob_name = 'test_blob_1.csv'
 
-    with open( blob_name, 'rb' ) as f :
-        blob.upload_from_file( f )
+    insert_data( blob_name )
 
     return 'ok', 200
 
 if __name__ == "__main__" :
 
     app.run( host='0.0.0.0', port=int( os.getenv( 'PORT', 8080 )))
+
