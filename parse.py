@@ -3,6 +3,7 @@
 
 import json
 import csv
+import datetime
 
 def flattenjson( i_item, delim ) :
 
@@ -20,7 +21,7 @@ def flattenjson( i_item, delim ) :
             val[ i_key ] = i_item[ i_key ]
     return val
 
-def parse_data( data, blobname ) :
+def parse_data( data, blobname, company_id ) :
     """Given a QuickBooks json iterable object,
     parse the data and save to blobname
     
@@ -33,7 +34,23 @@ def parse_data( data, blobname ) :
         str : location csv was saved to
 
     """
-    data = [ flattenjson( json.loads( row.to_json() ), '_' ) for row in data ]
+    # data = [ json.loads( row.to_json() ) for row in data ]
+
+    # data = [ flattenjson( row, '_' ) for row in data ]
+
+    new_data = []
+    for row in data :
+        row = row.to_json()
+        row = json.loads( row )
+        
+        row['company_id'] = company_id
+        row['rowloadeddatetime'] = datetime.datetime.today()
+
+        row = flattenjson( row, '_' )
+        
+        new_data.append( row )
+    
+    data = new_data
 
     columns = [ x for row in data for x in row.keys() ]
     columns = list( set( columns ) )

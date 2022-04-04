@@ -64,7 +64,7 @@ def initialize_clients( company_id: str ) -> tuple[ QuickBooks, Client ] :
 
     return qb_client, bq_client
 
-def insert_data( bq_client: Client, filename: str ) -> str :
+def insert_data( bq_client: Client, filename: str, data_obj_name: str ) -> str :
     """Insert/Appends data to a BQ table
 
     Args: 
@@ -75,13 +75,11 @@ def insert_data( bq_client: Client, filename: str ) -> str :
         str : 'ok' response
     """
 
-    table_id = 'yetibooks-reporting.qbo_raw.customers'
+    table_id = f'yetibooks-reporting.qbo_raw.{ data_obj_name }'
 
     job_config = bigquery.LoadJobConfig(
-        schema = [ bigquery.SchemaField( 'id', 'INT64' ),
-                   bigquery.SchemaField( 'company_id', 'INT64' ),
-                   bigquery.SchemaField( 'rowloadeddatetime', 'TIMESTAMP' ),
-                   bigquery.SchemaField( 'payload', 'STRING' ) ],
+        autodetect=True,
+        allow_quoted_newlines=True,
         write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
         source_format = bigquery.SourceFormat.CSV,
     )
@@ -105,47 +103,15 @@ def extract_data() :
     """
     
     company_id = '9130352109852406'
+    data_obj_name = 'customers'
     
-    bq_client = bigquery.Client()
-    
-    query_job = bq_client.query(
-        f"""
-        SELECT *
-        FROM `yetibooks-reporting.Utility.QBO_Secret_Store`
-        WHERE company_id = '{ company_id }'
-        """
-    )
-    
-    results = query_job.result()
-    
-    for row in results :
-    
-        client_id = row.client_id
-        client_secret = row.client_secret
-        access_token = row.access_token
-        environment = row.environment
-        redirect_uri = row.redirect_url
-        refresh_token = row.refresh_token
-    
-    # Instantiate auth client
-    auth_client = AuthClient(
-        client_id = client_id,
-        client_secret = client_secret,
-        access_token = access_token,
-        environment = environment,
-        redirect_uri = redirect_uri,
-    )
-    
-    # Instantiate client
-    qb_client = QuickBooks(
-        auth_client = auth_client,
-        refresh_token = refresh_token,
-        company_id = company_id,
-    )
-    
-    customers = Customer.all( qb=qb_client )
+    qb_client, bq_client = initialize_clients( company_id )
 
-    parse_data( customers, 'customer.csv' )
+    cust_blobname = f'{ data_obj_name }.csv'
+
+    customers = Customer.all( qb=qb_client )
+    parse_data( customers, cust_blobname, company_id )
+    insert_data( bq_client, cust_blobname, data_obj_name )
 
     return 'ok', 200
 
