@@ -6,6 +6,7 @@ from google.cloud import storage
 from google.cloud.storage import blob
 from quickbooks import QuickBooks
 from quickbooks.objects import Customer
+from parse import parse_data
 import json
 import csv
 import os
@@ -13,7 +14,7 @@ import datetime
 
 app = Flask( __name__ )
 
-def initialize_clients( company_id: str ) -> QuickBooks, Client :
+def initialize_clients( company_id: str ) -> tuple[ QuickBooks, Client ] :
     """Initializes the QuickBooks and BigQuery Clients
 
     Args :
@@ -93,8 +94,8 @@ def insert_data( bq_client: Client, filename: str ) -> str :
 
         load_job.result()  # Waits for the job to complete.
 
-    destination_table = client.get_table( table_id )
-    print( f'Loaded { destination_table.num_row } rows.' )
+    destination_table = bq_client.get_table( table_id )
+    print( f'Loaded { destination_table.num_rows } rows.' )
 
     return 'ok'
 
@@ -144,18 +145,7 @@ def extract_data() :
     
     customers = Customer.all( qb=qb_client )
 
-    customer_list = [ json.dumps( customer.to_json() ) for customer in customers ]
-
-    with open( 'test_blob_1.csv', 'w' ) as f :
-
-        writer = csv.writer( f )
-        for index, item in enumerate( customer_list ) : 
-            print( item )
-            writer.writerow( [ index, company_id, datetime.datetime.today(), item ] )
-
-    blob_name = 'test_blob_1.csv'
-
-    insert_data( blob_name )
+    parse_data( customers, 'customer.csv' )
 
     return 'ok', 200
 
