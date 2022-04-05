@@ -5,6 +5,7 @@ from google.cloud.bigquery import Client
 from google.cloud import storage
 from google.cloud.storage import blob
 from quickbooks import QuickBooks
+from quickbooks import objects as qbobj
 from quickbooks.objects import Customer
 from parse import parse_data
 import json
@@ -24,6 +25,8 @@ def initialize_clients( company_id: str ) -> tuple[ QuickBooks, Client ] :
         QuickBooks : quickbooks client
         Client : bigquery client
     """
+
+    print( '[WORKING] - Initializing clients for company:', company_id )
 
     bq_client = bigquery.Client()
     
@@ -75,12 +78,14 @@ def insert_data( bq_client: Client, filename: str, data_obj_name: str ) -> str :
         str : 'ok' response
     """
 
+    print( '[INSERT] - Inserting data into big query table for data obj:', data_obj_name )
+
     table_id = f'yetibooks-reporting.qbo_raw.{ data_obj_name }'
 
     job_config = bigquery.LoadJobConfig(
         autodetect=True,
         allow_quoted_newlines=True,
-        write_disposition=bigquery.WriteDisposition.WRITE_APPEND,
+        write_disposition=bigquery.WriteDisposition.WRITE_TRUNCATE,
         source_format = bigquery.SourceFormat.CSV,
     )
 
@@ -93,9 +98,22 @@ def insert_data( bq_client: Client, filename: str, data_obj_name: str ) -> str :
         load_job.result()  # Waits for the job to complete.
 
     destination_table = bq_client.get_table( table_id )
-    print( f'Loaded { destination_table.num_rows } rows.' )
+    print( f'[COMPLETE] - Loaded { destination_table.num_rows } rows.' )
 
     return 'ok'
+
+def run_etl( qb_client, bq_client, company_id, data_obj_name, qb_data_obj ) :
+    
+    print( '[WORKING - running etl for data obj:', data_obj_name )
+
+    cust_blobname = f'{ data_obj_name }.csv'
+
+    customers = qb_data_obj.all( qb=qb_client )
+    parse_data( customers, cust_blobname, company_id )
+    insert_data( bq_client, cust_blobname, data_obj_name )
+
+    return 'ok'
+
 
 @app.route( '/' )
 def extract_data() :
@@ -103,15 +121,25 @@ def extract_data() :
     """
     
     company_id = '9130352109852406'
-    data_obj_name = 'customers'
+
+    print( '[WORKING] - Starting load for company:', company_id )
     
     qb_client, bq_client = initialize_clients( company_id )
 
-    cust_blobname = f'{ data_obj_name }.csv'
-
-    customers = Customer.all( qb=qb_client )
-    parse_data( customers, cust_blobname, company_id )
-    insert_data( bq_client, cust_blobname, data_obj_name )
+    run_etl( qb_client, bq_client, company_id, 'account', qbobj.Account )
+    # run_etl( qb_client, bq_client, company_id, 'attachable', qbobj.Attachable )
+    run_etl( qb_client, bq_client, company_id, 'companyinfo', qbobj.CompanyInfo )
+    run_etl( qb_client, bq_client, company_id, 'customer', qbobj.Customer )
+    run_etl( qb_client, bq_client, company_id, 'deposit', qbobj.Deposit )
+    run_etl( qb_client, bq_client, company_id, 'invoice', qbobj.Invoice )
+    run_etl( qb_client, bq_client, company_id, 'item', qbobj.Item )
+    run_etl( qb_client, bq_client, company_id, 'journalentry', qbobj.JournalEntry )
+    run_etl( qb_client, bq_client, company_id, 'payment', qbobj.Payment )
+    run_etl( qb_client, bq_client, company_id, 'paymentmethod', qbobj.PaymentMethod )
+    run_etl( qb_client, bq_client, company_id, 'purchase', qbobj.Purchase )
+    run_etl( qb_client, bq_client, company_id, 'taxcode', qbobj.TaxCode )
+    run_etl( qb_client, bq_client, company_id, 'term', qbobj.Term )
+    run_etl( qb_client, bq_client, company_id, 'vendor', qbobj.Vendor )
 
     return 'ok', 200
 

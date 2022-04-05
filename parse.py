@@ -9,7 +9,14 @@ def flattenjson( i_item, delim ) :
 
     val = {}
     for i_key in i_item.keys() :
-    
+
+        if isinstance( i_item[ i_key ], list ) and len( i_item[ i_key ] ) == 1 :
+
+            j_item = flattenjson( i_item[ i_key ][0], delim )
+            for j_key in j_item.keys() :
+
+                val[ i_key + delim + j_key ] = j_item[ j_key ]
+                
         if isinstance( i_item[ i_key ], dict ) :
 
             j_item = flattenjson( i_item[ i_key ], delim )
@@ -19,6 +26,8 @@ def flattenjson( i_item, delim ) :
 
         else :
             val[ i_key ] = i_item[ i_key ]
+
+    print( val )
     return val
 
 def parse_data( data, blobname, company_id ) :
@@ -34,9 +43,8 @@ def parse_data( data, blobname, company_id ) :
         str : location csv was saved to
 
     """
-    # data = [ json.loads( row.to_json() ) for row in data ]
 
-    # data = [ flattenjson( row, '_' ) for row in data ]
+    print( '[TRANSLATE] - Translating json data into csv file' )
 
     new_data = []
     for row in data :
@@ -54,7 +62,6 @@ def parse_data( data, blobname, company_id ) :
 
     columns = [ x for row in data for x in row.keys() ]
     columns = list( set( columns ) )
-    print( columns )
 
     with open( blobname, 'w' ) as out_f :
 

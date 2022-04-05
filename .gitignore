@@ -1,2 +1,3 @@
 .quickbooks-venv/
 *.json
+*.csv
