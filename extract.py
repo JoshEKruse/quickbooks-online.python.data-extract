@@ -102,15 +102,25 @@ def insert_data( bq_client: Client, filename: str, data_obj_name: str ) -> str :
 
     return 'ok'
 
-def run_etl( qb_client, bq_client, company_id, data_obj_name, qb_data_obj ) :
+def run_etl( qb_client, bq_client, company_id, data_obj_name, qb_data_obj
+            ,line_trig=False) :
     
     print( '[WORKING - running etl for data obj:', data_obj_name )
 
-    cust_blobname = f'{ data_obj_name }.csv'
+    blobname = f'{ data_obj_name }.csv'
 
-    customers = qb_data_obj.all( qb=qb_client )
-    parse_data( customers, cust_blobname, company_id )
-    insert_data( bq_client, cust_blobname, data_obj_name )
+    data_objs = qb_data_obj.all( qb=qb_client )
+
+    if line_trig :
+
+        parse_data( data_objs, blobname, company_id )
+        insert_data( bq_client, blobname, data_obj_name )
+        insert_data( bq_client, blobname[:-4] + '_line.csv', data_obj_name + '_line' ) 
+
+    else :
+    
+        parse_data( data_objs, blobname, company_id )
+        insert_data( bq_client, blobname, data_obj_name )
 
     return 'ok'
 
@@ -126,8 +136,9 @@ def extract_data() :
     
     qb_client, bq_client = initialize_clients( company_id )
 
+    run_etl( qb_client, bq_client, company_id, 'invoice', qbobj.Invoice, line_trig=True )
     run_etl( qb_client, bq_client, company_id, 'account', qbobj.Account )
-    # run_etl( qb_client, bq_client, company_id, 'attachable', qbobj.Attachable )
+    run_etl( qb_client, bq_client, company_id, 'attachable', qbobj.Attachable )
     run_etl( qb_client, bq_client, company_id, 'companyinfo', qbobj.CompanyInfo )
     run_etl( qb_client, bq_client, company_id, 'customer', qbobj.Customer )
     run_etl( qb_client, bq_client, company_id, 'deposit', qbobj.Deposit )
